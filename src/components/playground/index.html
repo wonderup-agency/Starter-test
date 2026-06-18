@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Playground — Auto-cycling tabs (clip-path circle)</title>
+
+    <!-- Real component styles (source of truth, no duplication) -->
+    <link rel="stylesheet" href="./tabs.css" />
+
+    <!-- GSAP, same as loaded in Webflow via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 2rem;
+        background: #0d0d12;
+        color: #fff;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+      .preview-note {
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        font-size: 0.75rem;
+        opacity: 0.5;
+        max-width: 40ch;
+        line-height: 1.4;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="preview-note">
+      Preview harness. The JS below mirrors
+      <code>tabs.js</code> (the source of truth) so this file works on a plain
+      double-click. Keep them in sync if the logic changes.
+    </p>
+
+    <!-- The component builds its own DOM inside this element -->
+    <div data-component="tabs"></div>
+
+    <script>
+      // --- Mirror of tabs.js (CSS import omitted; gsap is global here) ---
+      const TABS = [
+        {
+          label: 'Discover',
+          title: 'Discover',
+          body: 'Auto-cycling tabs revealed with an expanding clip-path circle.',
+          gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        },
+        {
+          label: 'Design',
+          title: 'Design',
+          body: 'Each panel grows from the centre out — pure GSAP, no CSS keyframes.',
+          gradient: 'linear-gradient(135deg, #ec4899, #f43f5e)',
+        },
+        {
+          label: 'Build',
+          title: 'Build',
+          body: 'Hover to pause. Click a tab to jump. The progress bar drives the timing.',
+          gradient: 'linear-gradient(135deg, #14b8a6, #0ea5e9)',
+        },
+        {
+          label: 'Ship',
+          title: 'Ship',
+          body: 'Respects prefers-reduced-motion: the reveal is instant when requested.',
+          gradient: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+        },
+      ]
+
+      const AUTO_DELAY = 4
+      const REVEAL_DURATION = 0.9
+
+      function createTabs(root) {
+        root.classList.add('pg-tabs')
+        root.innerHTML = ''
+
+        const stage = document.createElement('div')
+        stage.className = 'pg-tabs__stage'
+
+        const panels = TABS.map((tab) => {
+          const panel = document.createElement('article')
+          panel.className = 'pg-tabs__panel'
+          panel.style.backgroundImage = tab.gradient
+          panel.innerHTML =
+            '<h3 class="pg-tabs__title">' +
+            tab.title +
+            '</h3><p class="pg-tabs__body">' +
+            tab.body +
+            '</p>'
+          stage.appendChild(panel)
+          return panel
+        })
+
+        const nav = document.createElement('div')
+        nav.className = 'pg-tabs__nav'
+        const buttons = []
+        const progressBars = []
+
+        TABS.forEach((tab, i) => {
+          const btn = document.createElement('button')
+          btn.className = 'pg-tabs__btn'
+          btn.type = 'button'
+          btn.textContent = tab.label
+          const progress = document.createElement('span')
+          progress.className = 'pg-tabs__progress'
+          btn.appendChild(progress)
+          btn.addEventListener('click', () => goTo(i))
+          nav.appendChild(btn)
+          buttons.push(btn)
+          progressBars.push(progress)
+        })
+
+        root.appendChild(stage)
+        root.appendChild(nav)
+
+        let current = -1
+        let progressTween = null
+
+        const prefersReduced =
+          window.matchMedia &&
+          window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        const revealDuration = prefersReduced ? 0 : REVEAL_DURATION
+
+        gsap.set(panels, { autoAlpha: 0, zIndex: 0 })
+        gsap.set(progressBars, { scaleX: 0, transformOrigin: 'left center' })
+
+        function killTimer() {
+          if (progressTween) progressTween.kill()
+        }
+
+        function startTimer() {
+          killTimer()
+          gsap.set(progressBars, { scaleX: 0 })
+          progressTween = gsap.to(progressBars[current], {
+            scaleX: 1,
+            duration: AUTO_DELAY,
+            ease: 'none',
+            onComplete: () => goTo((current + 1) % TABS.length),
+          })
+        }
+
+        function goTo(index) {
+          if (index === current) return
+          const incoming = panels[index]
+          buttons.forEach((b, i) =>
+            b.classList.toggle('is-active', i === index)
+          )
+          gsap.set(panels, { zIndex: 0 })
+          gsap.set(incoming, { zIndex: 2, autoAlpha: 1 })
+          gsap.fromTo(
+            incoming,
+            { clipPath: 'circle(0% at 50% 50%)' },
+            {
+              clipPath: 'circle(75% at 50% 50%)',
+              duration: revealDuration,
+              ease: 'power2.inOut',
+              onComplete: () => {
+                panels.forEach((p, i) => {
+                  if (i !== index) gsap.set(p, { autoAlpha: 0 })
+                })
+              },
+            }
+          )
+          current = index
+          startTimer()
+        }
+
+        root.addEventListener(
+          'mouseenter',
+          () => progressTween && progressTween.pause()
+        )
+        root.addEventListener(
+          'mouseleave',
+          () => progressTween && progressTween.play()
+        )
+
+        goTo(0)
+      }
+
+      document
+        .querySelectorAll('[data-component="tabs"]')
+        .forEach((el) => createTabs(el))
+    </script>
+  </body>
+</html>

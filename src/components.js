@@ -12,4 +12,13 @@
 // Both scaffold the file and add an entry here automatically.
 // --------------------------------------------------
 
-export default []
+export default [
+  {
+    selector: "[data-component='tabs']",
+    importFn: () => import('./components/playground/tabs.js'),
+  },
+  {
+    selector: "[data-component='test']",
+    importFn: () => import('./components/test.js'),
+  },
+]
